@@ -41,8 +41,10 @@ class TextCleaner(DataCleaner):
         self.strip_whitespace = self.config.get("text_cleaner.strip_whitespace", True)
         self.replace_patterns = self.config.get("text_cleaner.replace_patterns", {})
         
-        # Compile regex patterns for performance
-        self.special_chars_pattern = re.compile(r"[^a-zA-Z0-9\s]")
+        # 编译正则表达式（新增表情符号和特殊符号匹配）
+        self.special_chars_pattern = re.compile(
+            r"[^a-zA-Z0-9\s]|[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF¤§]"
+        )
         self.extra_spaces_pattern = re.compile(r"\s+")
         self.newlines_pattern = re.compile(r"[\r\n]+")
         self.digits_pattern = re.compile(r"\d+")
@@ -67,6 +69,9 @@ class TextCleaner(DataCleaner):
             self.logger.error(f"Error converting to string: {e}")
             return None
         
+        # 新增特殊字符移除统计
+        original_length = len(cleaned_text)
+        
         # Apply cleaning operations based on configuration
         if self.lowercase:
             cleaned_text = cleaned_text.lower()
@@ -89,6 +94,12 @@ class TextCleaner(DataCleaner):
         # Apply custom replace patterns
         for pattern, replacement in self.replace_patterns.items():
             cleaned_text = re.sub(pattern, replacement, cleaned_text)
+        
+        # 更新清洗统计（记录移除的特殊字符数量）
+        removed_chars = original_length - len(cleaned_text)
+        if hasattr(self, 'clean_stats'):
+            self.clean_stats.setdefault("special_chars_removed", 0)
+            self.clean_stats["special_chars_removed"] += removed_chars
         
         # Return None if text is empty after cleaning
         return cleaned_text if cleaned_text else None
